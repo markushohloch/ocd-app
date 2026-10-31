@@ -1,0 +1,15 @@
+# VS Code
+.vscode/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp files
+*.tmp
+*.bak
+*.sql~
+
+# APEX exports (unkritische Zwischenversionen)
+# app_export.sql wird versioniert!
