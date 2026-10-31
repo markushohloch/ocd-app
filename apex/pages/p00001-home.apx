@@ -39,16 +39,19 @@ page 1 (
             type: sqlQuery
             sqlQuery:
                 ```sql
-                SELECT 
+                select 
                     object_name,
                     json_value(pkg_data, '$.name') as name,
                     json_value(pkg_data, '$.desc') as description,
                     pkg_data
-                FROM ocd.ocd_apex_package_docs
-                WHERE :P1_SEARCH IS NULL
-                OR UPPER(json_value(pkg_data, '$.name')) LIKE UPPER('%' || :P1_SEARCH || '%')
-                OR UPPER(json_value(pkg_data, '$.description')) LIKE UPPER('%' || :P1_SEARCH || '%')
-                                
+                from ocd_apex_package_docs
+                where :P1_SEARCH IS null
+                or upper(json_value(pkg_data, '$.name')) like upper('%' || :P1_SEARCH || '%')
+                or upper(json_value(pkg_data, '$.desc')) like upper('%' || :P1_SEARCH || '%')
+                
+                
+                
+                
                 ```
             pageItemsToSubmit: P1_SEARCH
         }

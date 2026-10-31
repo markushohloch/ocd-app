@@ -16,8 +16,9 @@ app OCD_APEX (
         listTemplate: @/side-navigation-menu
         templateOptions: [
             #DEFAULT#
-            t-TreeNav--styleA
+            js-defaultCollapsed
             js-navCollapsed--hidden
+            t-TreeNav--styleA
         ]
         list: @navigation-menu
     }
@@ -29,7 +30,8 @@ app OCD_APEX (
     userInterface {
         currentTheme: @universal-theme
         globalPage: 0
-        addBuiltWithApexToFooter: false
+        usersCanChooseThemeStyle: true
+        autoDismissSuccessMessages: true
     }
     appFormatMasks {
         date: DS

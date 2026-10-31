@@ -45,19 +45,15 @@ page 2 (
             type: sqlQuery
             sqlQuery:
                 ```sql
-                SELECT
-                    json_value(func, '$.name') as func_name,
-                    json_value(func, '$.description') as func_desc,
-                    json_value(func, '$.return_type') as return_type
-                FROM 
-                    ocd.ocd_apex_package_docs,
-                    JSON_TABLE(pkg_data, '$.functions[*]' COLUMNS (func PATH '$'))
-                WHERE object_name = :P2_PACKAGE_NAME
+                select *
+                from ocd_apex_components
+                where object_name = :P2_PACKAGE_NAME
+                and comp_type = 'FUNCTION'
                 ```
             pageItemsToSubmit: P2_PACKAGE_NAME
         }
         layout {
-            sequence: 30
+            sequence: 40
             slot: body
         }
         appearance {
@@ -75,42 +71,92 @@ page 2 (
             savedReportMappingIdentifier: 13561983485667116
         }
 
-        column FUNC_DESC (
+        column COMP_DESC (
             type: plainText
             heading {
-                heading: Description
+                heading: Comp Desc
             }
             layout {
-                sequence: 20
+                sequence: 80
             }
             source {
                 dataType: STRING
             }
             advanced {
-                endUserAlias: B
+                endUserAlias: J
             }
         )
 
-        column FUNC_NAME (
+        column COMP_NAME (
             type: plainText
             heading {
-                heading: Function Name
+                heading: Comp Name
             }
             layout {
-                sequence: 10
+                sequence: 60
             }
             source {
                 dataType: STRING
             }
             advanced {
-                endUserAlias: A
+                endUserAlias: H
             }
         )
 
-        column RETURN_TYPE (
+        column COMP_SEQ (
             type: plainText
             heading {
-                heading: Return Type
+                heading: Comp Seq
+                alignment: end
+            }
+            layout {
+                sequence: 50
+                columnAlignment: end
+            }
+            source {
+                dataType: NUMBER
+            }
+            advanced {
+                endUserAlias: G
+            }
+        )
+
+        column COMP_TYPE (
+            type: plainText
+            heading {
+                heading: Comp Type
+            }
+            layout {
+                sequence: 70
+            }
+            source {
+                dataType: STRING
+            }
+            advanced {
+                endUserAlias: I
+            }
+        )
+
+        column OBJECT_NAME (
+            type: plainText
+            heading {
+                heading: Object Name
+            }
+            layout {
+                sequence: 40
+            }
+            source {
+                dataType: STRING
+            }
+            advanced {
+                endUserAlias: F
+            }
+        )
+
+        column SYNTAX (
+            type: plainText
+            heading {
+                heading: Syntax
             }
             layout {
                 sequence: 30
@@ -119,7 +165,7 @@ page 2 (
                 dataType: STRING
             }
             advanced {
-                endUserAlias: C
+                endUserAlias: D
             }
         )
 
@@ -134,15 +180,15 @@ page 2 (
                 rowsPerPage: 50
             }
 
-            displayColumn FUNC_DESC (
+            displayColumn COMP_DESC (
                 sequence: 2
             )
 
-            displayColumn FUNC_NAME (
+            displayColumn COMP_NAME (
                 sequence: 1
             )
 
-            displayColumn RETURN_TYPE (
+            displayColumn SYNTAX (
                 sequence: 3
             )
 
@@ -174,7 +220,7 @@ page 2 (
             pageItemsToSubmit: P2_PACKAGE_NAME
         }
         layout {
-            sequence: 50
+            sequence: 60
             slot: body
         }
         appearance {
@@ -198,12 +244,12 @@ page 2 (
                 declare
                     v_content clob;
                 begin
-                    SELECT 
+                    select 
                         '<h3>' || json_value(pkg_data, '$.name') || '</h3>' 
-                        ||'<p>' || json_value(pkg_data, '$.description') || '</p>' c
+                        ||'<p>' || json_value(pkg_data, '$.desc') || '</p>' c
                     into v_content
-                    FROM ocd.ocd_apex_package_docs
-                    WHERE object_name = :P2_PACKAGE_NAME;
+                    from ocd_apex_package_docs
+                    where object_name = :P2_PACKAGE_NAME;
                 
                     return v_content;
                 end;
@@ -211,7 +257,7 @@ page 2 (
             pageItemsToSubmit: P2_PACKAGE_NAME
         }
         layout {
-            sequence: 20
+            sequence: 30
             slot: body
         }
         appearance {
@@ -242,7 +288,7 @@ page 2 (
             pageItemsToSubmit: P2_PACKAGE_NAME
         }
         layout {
-            sequence: 40
+            sequence: 50
             slot: body
         }
         appearance {
@@ -317,7 +363,7 @@ page 2 (
     pageItem P2_PACKAGE_NAME (
         type: hidden
         layout {
-            sequence: 10
+            sequence: 20
             slot: body
         }
     )
@@ -326,7 +372,7 @@ page 2 (
         buttonName: BACK
         label: Back
         layout {
-            sequence: 60
+            sequence: 10
             slot: body
         }
         appearance {
@@ -344,34 +390,6 @@ page 2 (
                 page: 1
             }
         }
-    )
-
-    button new (
-        buttonName: New
-        label: New
-        layout {
-            sequence: 70
-            slot: body
-        }
-        appearance {
-            buttonTemplate: @/text
-            templateOptions: #DEFAULT#
-        }
-        behavior {
-            action: triggerAction
-        }
-
-        triggerAction native-refresh (
-            action: refresh
-            affectedElements {
-                selectionType: region
-                region: @functions
-            }
-            execution {
-                sequence: 10
-            }
-        )
-
     )
 
     dynamicAction new (
