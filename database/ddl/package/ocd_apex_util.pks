@@ -8,16 +8,16 @@ AS
   -- Inspects all VALID packages of the current schema with [[API]].
   -- Useful for documenting a schema in one go.
   -- ^begin
-  -- ^  ocd_apex_util.inspect_all_packages;
-  -- ^end;
+  --  ocd_apex_util.inspect_all_packages;
+  --end;
   PROCEDURE inspect_all_packages;
 
   -- Inspects a single package with [[API]].
   -- Raises `ORA-20001` if the package does not exist in the current schema.
   -- @The name of the package, case is ignored.
   -- ^begin
-  -- ^  ocd_apex_util.inspect_package('WORKER');
-  -- ^end;
+  --  ocd_apex_util.inspect_package('WORKER');
+  --end;
   PROCEDURE inspect_package(i_package_name IN VARCHAR2);
 
   -- Counts the packages that carry a package level description.
@@ -37,6 +37,33 @@ AS
     i_object_name IN VARCHAR2,
     i_comp_name   IN VARCHAR2
   ) RETURN CLOB;
+
+  -- Converts a description text written in OCDs into HTML.
+  --
+  -- The text is escaped first. Then backticks become `code` elements,
+  -- URIs (optionally followed by a short name in square brackets) become
+  -- links, references like `[[PACKAGE.COMPONENT]]` become links to the
+  -- details page and line breaks separate paragraphs.
+  -- References to packages that do not exist in the current schema are
+  -- rendered as `code` elements.
+  -- @The description text.
+  -- @The package used to resolve references without a package name.
+  -- ^select ocd_apex_util.text_html('See [[API.INFORMATION]].', 'API') from dual;
+  FUNCTION text_html(
+    i_text         IN CLOB,
+    i_package_name IN VARCHAR2 DEFAULT NULL
+  ) RETURN CLOB;
+
+  -- Renders the complete documentation of a package as HTML.
+  --
+  -- The layout follows the Oracle Database PL/SQL Packages Reference:
+  -- description, constants, subtypes, types, exceptions, a summary of
+  -- all subprograms and one section per subprogram.
+  -- Every component gets an anchor `ocd-<name>` (overloads get `-<n>`).
+  -- The return value is `NULL` when the package does not exist.
+  -- @The name of the package, case is ignored.
+  -- ^select ocd_apex_util.package_html('API') from dual;
+  FUNCTION package_html(i_package_name IN VARCHAR2) RETURN CLOB;
 
 END ocd_apex_util;
 /

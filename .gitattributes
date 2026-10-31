@@ -1,0 +1,3 @@
+# APEXlang parser rejects CRLF
+*.apx text eol=lf
+apex/**/*.json text eol=lf
