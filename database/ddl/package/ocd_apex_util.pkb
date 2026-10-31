@@ -5,6 +5,19 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
   -- Page of the APEX application that shows a single package.
   c_details_page CONSTANT PLS_INTEGER := 2;
 
+  -- One entry of `$.components[*]` from [[API.INFORMATION]].
+  -- @Position of the component within the package specification.
+  -- @Name of the component.
+  -- @One of `FUNCTION`, `PROCEDURE`, `CONSTANT`, `SUBTYPE`, `TYPE` or `EXCEPTION`.
+  -- @Description of the component.
+  -- @Declaration of a function or procedure.
+  -- @Data type of a constant.
+  -- @Value of a constant.
+  -- @Parameters of a function or procedure as JSON array.
+  -- @Code examples of a function or procedure as JSON array.
+  -- @Fields of a record type as JSON array.
+  -- @Number of the overload, starting with 1.
+  -- @Number of components with the same name.
   TYPE t_component IS RECORD (
     comp_seq    PLS_INTEGER,
     comp_name   VARCHAR2(128),
@@ -19,6 +32,7 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
     overload    PLS_INTEGER,
     name_count  PLS_INTEGER
   );
+  -- All components of a package in declaration order.
   TYPE t_component_tab IS TABLE OF t_component;
 
 
@@ -156,6 +170,10 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
   END params_md;
 
 
+  -- Private function.
+  -- Checks whether a package exists in the current schema.
+  -- The return value is `TRUE` if the package exists, whatever its status.
+  -- @The name of the package, case is ignored.
   FUNCTION is_package(i_name IN VARCHAR2) RETURN BOOLEAN IS
     v_count PLS_INTEGER;
 
@@ -171,18 +189,30 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
   END is_package;
 
 
+  -- Private function.
+  -- Builds the HTML id of a component, e.g. `ocd-inspect` or `ocd-inspect-2`.
+  --
+  -- The id is used as anchor in [[PACKAGE_HTML]] and as link target in
+  -- [[TEXT_HTML]]. The return value is already escaped for an HTML attribute,
+  -- because quoted identifiers like `"C_>>"` may contain any character.
+  -- @The name of the component.
+  -- @The number of the overload; only overloads after the first get a suffix.
   FUNCTION anchor_id(
     i_comp_name IN VARCHAR2,
     i_overload  IN PLS_INTEGER DEFAULT 1
   ) RETURN VARCHAR2 IS
   BEGIN
-    -- Quoted identifiers like "C_>>" may contain any character.
     RETURN apex_escape.html_attribute(
       'ocd-' || LOWER(i_comp_name)
       || CASE WHEN i_overload > 1 THEN '-' || i_overload END);
   END anchor_id;
 
 
+  -- Private function.
+  -- Builds the URL of the details page for a package.
+  -- The return value contains the checksum required by the page, as long as
+  -- it is called within an APEX session.
+  -- @The name of the package, case is ignored.
   FUNCTION package_url(i_package_name IN VARCHAR2) RETURN VARCHAR2 IS
   BEGIN
     RETURN apex_page.get_url(
@@ -192,8 +222,18 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
   END package_url;
 
 
-  -- Resolves a reference like PACKAGE, COMPONENT, PACKAGE.COMPONENT,
-  -- SCHEMA.PACKAGE or SCHEMA.PACKAGE.COMPONENT into a link.
+  -- Private function.
+  -- Resolves the content of a `[[...]]` reference into an HTML link.
+  --
+  -- Supported forms are `PACKAGE`, `COMPONENT`, `PACKAGE.COMPONENT`,
+  -- `SCHEMA.PACKAGE` and `SCHEMA.PACKAGE.COMPONENT`. A single name is taken
+  -- as package if such a package exists, otherwise as component of the current
+  -- package. The schema is ignored, because only packages of the current
+  -- schema are shown. References to the current package link to the anchor
+  -- on the same page.
+  -- The return value is a `code` element if the package does not exist.
+  -- @The reference without the square brackets.
+  -- @The package of the text that contains the reference.
   FUNCTION reference_html(
     i_ref          IN VARCHAR2,
     i_package_name IN VARCHAR2
@@ -301,12 +341,19 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
     v_comps        t_component_tab;
     v_started      BOOLEAN;
 
+    -- Private procedure of `package_html`.
+    -- Appends a line to the HTML output.
+    -- @The HTML fragment.
     PROCEDURE add(i_text IN CLOB) IS
     BEGIN
       v_html := v_html || i_text || CHR(10);
     END add;
 
+    -- Private function of `package_html`.
+    -- Renders a code block with a title and a copy button in its header bar.
     -- The copy button is handled by the JavaScript of the details page.
+    -- @The code, it is escaped.
+    -- @The title, e.g. `Syntax` or `Example 2`; it is not escaped.
     FUNCTION code_html(i_code IN CLOB, i_title IN VARCHAR2) RETURN CLOB IS
     BEGIN
       RETURN '<div class="ocd-code"><div class="ocd-code-bar">'
@@ -317,7 +364,12 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
         || '<pre><code>' || apex_escape.html(i_code) || '</code></pre></div>';
     END code_html;
 
-    -- Starts a section with a table, but only for the first component of a kind.
+    -- Private procedure of `package_html`.
+    -- Starts a section with a heading and a table, but only for the first
+    -- component of a kind; `v_started` must be reset before each kind.
+    -- @The heading of the section.
+    -- @The header cells of the table.
+    -- @The CSS class of the table, which defines the column widths.
     PROCEDURE start_table(
       i_title  IN VARCHAR2,
       i_header IN VARCHAR2,
@@ -331,6 +383,8 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
       END IF;
     END start_table;
 
+    -- Private procedure of `package_html`.
+    -- Closes the table opened by `start_table`, if there is one.
     PROCEDURE end_table IS
     BEGIN
       IF v_started THEN
@@ -338,7 +392,11 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
       END IF;
     END end_table;
 
-    -- Renders a list of {name, desc} objects as a two column table.
+    -- Private procedure of `package_html`.
+    -- Renders a JSON array of `{name, desc}` objects as a two column table.
+    -- Nothing is rendered if the array is `NULL`.
+    -- @The JSON array, e.g. the parameters or fields of a component.
+    -- @The header of the first column.
     PROCEDURE name_desc_table(i_json IN CLOB, i_header IN VARCHAR2) IS
     BEGIN
       IF i_json IS NULL THEN
