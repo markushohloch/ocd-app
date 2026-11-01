@@ -31,6 +31,21 @@ select ocd_apex_util.package_html('YOUR_PACKAGE_NAME') from dual;
 
 :information_source: Links to other packages point to the details page of the application and are only valid within an APEX session.
 
+## REST service
+
+Besides the APEX application, the documentation is also available as REST service via [ORDS](https://www.oracle.com/database/technologies/appdev/rest.html). The module `ocd.docs` is installed with the script `database/ords/ocd_docs.sql` and provides two endpoints:
+
+| Endpoint | Result |
+| --- | --- |
+| `GET .../ords/<schema-alias>/docs/packages/` | All packages of the schema with name and description |
+| `GET .../ords/<schema-alias>/docs/packages/:name` | The JSON output of `ocd.api.information` for a single package (`404` if the package does not exist) |
+
+```shell
+curl https://<host>/ords/ocd/docs/packages/pkg_sample
+```
+
+:information_source: Both endpoints can be read without authentication. The `OCD` schema must be REST enabled (`ords.enable_schema`).
+
 ## Installation
 
 __ora* CODEDOC__ must be installed first. All objects of __ocd-apex__ are installed in the `OCD` schema.

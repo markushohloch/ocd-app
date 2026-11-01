@@ -22,6 +22,13 @@ DECLARE
   END drop_object;
 
 BEGIN
+  -- ORDS-Modul (optional installiert ueber ords/ocd_docs.sql)
+  FOR r_module IN (SELECT name FROM user_ords_modules WHERE name = 'ocd.docs') LOOP
+    ords.delete_module(p_module_name => r_module.name);
+    COMMIT;
+    DBMS_OUTPUT.PUT_LINE('Done: ords.delete_module(' || r_module.name || ')');
+  END LOOP;
+
   -- Package
   drop_object('DROP PACKAGE ocd_apex_util');
 
