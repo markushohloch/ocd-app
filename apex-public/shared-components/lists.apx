@@ -1,0 +1,115 @@
+list navigation-bar (
+    name: Navigation Bar
+
+    entry sign-in (
+        label: Sign In
+        icon {
+            imageIconCssClasses: fa-sign-in
+        }
+        layout {
+            sequence: 5
+        }
+        link {
+            target: {
+                page: LOGIN
+            }
+        }
+        serverSideCondition {
+            type: userIsPublicUser
+        }
+    )
+
+    entry app-user (
+        label: &APP_USER.
+        icon {
+            imageIconCssClasses: fa-user
+        }
+        layout {
+            sequence: 10
+        }
+        link {
+            target: {
+                type: url
+                url: #
+            }
+        }
+        userDefinedAttributes {
+            2: has-username
+        }
+        serverSideCondition {
+            type: userIsAuthenticated
+        }
+    )
+
+    entry list_item (
+        label: ---
+        layout {
+            sequence: 20
+            parentEntry: @app-user
+        }
+        link {
+            target: {
+                type: url
+                url: separator
+            }
+        }
+        serverSideCondition {
+            type: userIsAuthenticated
+        }
+    )
+
+    entry sign-out (
+        label: Sign Out
+        icon {
+            imageIconCssClasses: fa-sign-out
+        }
+        layout {
+            sequence: 30
+            parentEntry: @app-user
+        }
+        link {
+            target: {
+                type: url
+                url: &LOGOUT_URL.
+            }
+        }
+        serverSideCondition {
+            type: userIsAuthenticated
+        }
+    )
+
+)
+
+list navigation-menu (
+    name: Navigation Menu
+    source {
+        type: sqlQuery
+        sqlQuery:
+            ```sql
+            -- Home and all packages of the schema, the current package is highlighted
+            select lvl, label, target, is_current, image
+              from (
+                select 1 as lvl,
+                       'Home' as label,
+                       apex_page.get_url(p_page => 1) as target,
+                       case when :APP_PAGE_ID = 1 then 'YES' else 'NO' end as is_current,
+                       'fa-home' as image,
+                       0 as sort_order
+                  from dual
+                union all
+                select 1,
+                       object_name,
+                       apex_page.get_url(
+                         p_page   => 2,
+                         p_items  => 'P2_PACKAGE_NAME',
+                         p_values => object_name),
+                       case when :APP_PAGE_ID = 2 and object_name = :P2_PACKAGE_NAME then 'YES' else 'NO' end,
+                       'fa-cube',
+                       1
+                  from user_objects
+                 where object_type = 'PACKAGE'
+              )
+             order by sort_order, label
+            ```
+    }
+)

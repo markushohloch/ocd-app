@@ -1,0 +1,322 @@
+page 1 (
+    name: Package Browser
+    alias: HOME
+    title: ora* CODEDOC - Package Browser
+    appearance {
+        pageTemplate: @/standard
+        templateOptions: #DEFAULT#
+    }
+    navigation {
+        cursorFocus: doNotFocusCursor
+        warnOnUnsavedChanges: false
+    }
+    css {
+        inline:
+            ```css
+            /* Not "disabled": Universal Theme sets pointer-events: none, which hides the tooltip */
+            .t-Button[aria-disabled="true"] {
+              opacity: .5;
+              cursor: not-allowed;
+            }
+            ```
+    }
+    security {
+        authentication: public
+        pageAccessProtection: argumentsMustHaveChecksum
+        formAutoComplete: false
+    }
+
+    region ora-codedoc-package-browser (
+        name: ora* CODEDOC - Package Browser
+        type: staticContent
+        source {
+            htmlCode:
+                ```html
+                <p>Technical documentation of the PL/SQL packages in this schema, generated on the fly by <a href="https://github.com/yerba1704/ocd" target="_blank" rel="noopener">ora* CODEDOC</a>.</p>
+                <p>Source code and installation of this application: <a href="https://github.com/yerba1704/ocd-apex" target="_blank" rel="noopener"><span class="fa fa-github" aria-hidden="true"></span> yerba1704/ocd-apex</a></p>
+                ```
+        }
+        layout {
+            sequence: 10
+            slot: breadcrumbBar
+        }
+        appearance {
+            template: @/hero
+            templateOptions: [
+                #DEFAULT#
+                t-HeroRegion--hideIcon
+            ]
+        }
+    )
+
+    region packages (
+        name: PACKAGES
+        type: interactiveReport
+        source {
+            location: localDatabase
+            type: sqlQuery
+            sqlQuery:
+                ```sql
+                select 
+                    object_name,
+                    json_value(pkg_data, '$.name') as name,
+                    json_value(pkg_data, '$.desc') as description,
+                    pkg_data
+                from ocd_apex_package_docs
+                where :P1_SEARCH IS null
+                or upper(json_value(pkg_data, '$.name')) like upper('%' || :P1_SEARCH || '%')
+                or upper(json_value(pkg_data, '$.desc')) like upper('%' || :P1_SEARCH || '%')
+                
+                
+                
+                
+                ```
+            pageItemsToSubmit: P1_SEARCH
+        }
+        layout {
+            sequence: 30
+            slot: body
+        }
+        appearance {
+            template: @/interactive-report
+            templateOptions: [
+                #DEFAULT#
+                t-IRR-region--hideHeader js-addHiddenHeadingRoleDesc
+            ]
+        }
+        link {
+            linkColumn: customTarget
+            target: {
+                page: 2
+                items: {
+                    P2_PACKAGE_NAME: #OBJECT_NAME#
+                }
+                clearCache: 2
+            }
+        }
+        pagination {
+            type: rowRangesXToY
+        }
+        advanced {
+            savedReportMappingIdentifier: 13560645830667103
+        }
+
+        column DESCRIPTION (
+            type: plainText
+            heading {
+                heading: Description
+            }
+            layout {
+                sequence: 30
+            }
+            source {
+                dataType: STRING
+            }
+            advanced {
+                endUserAlias: C
+            }
+        )
+
+        column NAME (
+            type: plainText
+            heading {
+                heading: Name
+            }
+            layout {
+                sequence: 20
+            }
+            source {
+                dataType: STRING
+            }
+            advanced {
+                endUserAlias: B
+            }
+        )
+
+        column OBJECT_NAME (
+            type: plainText
+            heading {
+                heading: Object Name
+            }
+            layout {
+                sequence: 10
+            }
+            source {
+                dataType: STRING
+            }
+            advanced {
+                endUserAlias: A
+            }
+        )
+
+        column PKG_DATA (
+            type: plainText
+            heading {
+                heading: Pkg Data
+            }
+            layout {
+                sequence: 40
+            }
+            source {
+                dataType: CLOB
+            }
+            columnFilter {
+                type: none
+            }
+            advanced {
+                endUserAlias: D
+            }
+            enableUsersTo {
+                sort: false
+                controlBreak: false
+                aggregate: false
+                compute: false
+                chart: false
+                groupBy: false
+                pivot: false
+            }
+        )
+
+        page {
+            borderWidth: 0.5
+            borderColor: #666666
+        }
+
+        savedReport primary (
+            visibility: primaryDefault
+            view {
+                rowsPerPage: 50
+            }
+
+            displayColumn DESCRIPTION (
+                sequence: 3
+            )
+
+            displayColumn NAME (
+                sequence: 2
+            )
+
+            displayColumn OBJECT_NAME (
+                sequence: 1
+            )
+
+        )
+
+    )
+
+    pageItem P1_SEARCH (
+        type: textField
+        label {
+            label: Search Packages
+            alignment: left
+        }
+        layout {
+            sequence: 20
+            slot: body
+            alignment: left
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+            width: 30
+            valuePlaceholder: Enter package name...
+        }
+        help {
+            helpText: Search in package names and descriptions
+        }
+    )
+
+    button inspect-all (
+        buttonName: INSPECT_ALL
+        label: Inspect all packages
+        layout {
+            sequence: 40
+            slot: body
+        }
+        appearance {
+            buttonTemplate: @/text
+            templateOptions: #DEFAULT#
+        }
+        behavior {
+            warnOnUnsavedChanges: doNotCheck
+        }
+        serverSideCondition {
+            type: userIsAuthenticated
+        }
+        security {
+            authorizationScheme: mustNotBePublicUser
+        }
+    )
+
+    button inspect-all-disabled (
+        buttonName: INSPECT_ALL_DISABLED
+        label: Inspect all packages
+        layout {
+            sequence: 41
+            slot: body
+        }
+        appearance {
+            buttonTemplate: @/text
+            templateOptions: #DEFAULT#
+        }
+        behavior {
+            action: definedByDynamicAction
+        }
+        advanced {
+            customAttributes: aria-disabled="true" title="Sign in to inspect all packages"
+        }
+        serverSideCondition {
+            type: userIsPublicUser
+        }
+    )
+
+    dynamicAction refresh-packages-report (
+        name: Refresh Packages Report
+        execution {
+            sequence: 10
+        }
+        when {
+            event: keyup
+            selectionType: items
+            items: P1_SEARCH
+        }
+
+        action native-refresh (
+            action: refresh
+            affectedElements {
+                selectionType: region
+                region: @packages
+            }
+            execution {
+                sequence: 10
+                fireOnInit: false
+            }
+        )
+
+    )
+
+    process inspect-all-packages (
+        name: Inspect All Packages
+        type: executeCode
+        source {
+            plsqlCode: ocd.ocd_apex_util.inspect_all_packages;
+        }
+        execution {
+            sequence: 10
+        }
+        successMessage {
+            successMessage: Documentation of all packages created
+        }
+        advanced {
+            executionMappingIdentifier: 13561272623667109
+        }
+        serverSideCondition {
+            whenButtonPressed: @inspect-all
+        }
+        security {
+            authorizationScheme: mustNotBePublicUser
+        }
+    )
+
+)
+
