@@ -6,95 +6,109 @@
 Oracle Cloud Database
 └── OCD Schema
     ├── ocd.api.* (ora* CODEDOC Framework)
-    ├── v_ocd_packages (View für APEX)
-    └── APEX Application
+    ├── Views
+    │   ├── ocd_apex_package_docs      (je Package das JSON aus ocd.api.information)
+    │   ├── ocd_apex_components        ($.components[*] als Zeilen)
+    │   └── ocd_apex_component_params  ($.components[*].parameters[*] als Zeilen)
+    ├── Package ocd_apex_util          (Inspect-Helfer, HTML-Rendering der Doku)
+    └── APEX Application 128
 ```
 
 **Prinzip**: Alles im OCD Schema, keine Synonyme, direkte Zugriffe.
+Die App zeigt nur Packages des OCD Schemas (`user_objects`).
 
-## Phase 1: MVP – Package Browser (Read-Only)
+Läuft die APEX-App mit einem anderen Parsing Schema, braucht dieses:
+
+```sql
+-- im OCD Schema
+grant select on ocd_apex_package_docs to <APEX_SCHEMA>;
+grant select on ocd_apex_components to <APEX_SCHEMA>;
+grant select on ocd_apex_component_params to <APEX_SCHEMA>;
+grant execute on ocd_apex_util to <APEX_SCHEMA>;
+```
+
+## MVP – Package Browser (Read-Only)
 
 ### User Stories
 
-**US-1: Package-Liste anzeigen**
-- Alle dokumentierten PL/SQL-Pakete auflisten
-- Paketname, kurze Beschreibung, Status anzeigen
-- Sortierung nach Name
-- Paginierung für große Mengen
+**US-1: Package-Liste anzeigen** ✅
+- Alle PL/SQL-Pakete des Schemas auflisten
+- Paketname und Beschreibung anzeigen
+- Sortierung und Paginierung über den Interactive Report
+- Button „Inspect all packages“ ruft `ocd_apex_util.inspect_all_packages` auf
 
-**US-2: Paketdetails anzeigen**
+**US-2: Paketdetails anzeigen** ✅
 - Klick auf Paket → Detailseite (P2)
-- Gliederung:
-  - Paketübersicht (Name, Beschreibung, Status)
-  - Funktionen (Tabelle: Name, Parameter, Return Type, Beschreibung)
-  - Prozeduren (Tabelle: Name, Parameter, Beschreibung)
-- Breadcrumb: Home → Paket
+- Aufbau wie die Oracle PL/SQL Packages Reference:
+  - Beschreibung
+  - Constants, Subtypes, Types (mit Fields), Exceptions
+  - Übersicht der Subprograms
+  - je Subprogram: Beschreibung, Syntax, Parameter, Examples
+- OCDs-Formatierung: Backticks, Absätze, URLs (optional mit `[Namen]`), `[[PACKAGE.COMPONENT]]` als Link mit Anker
+- Copy-Button für Syntax und Examples
+- Back-Button in der Titelleiste und am Seitenende
+- Breadcrumb: Home → Package Details
 
-**US-3: Suchfunktion**
+**US-3: Suchfunktion** ✅
 - Suchfeld auf Startseite
-- Echtzeit-Filter in Paketliste
+- Filter bei jeder Eingabe (Dynamic Action auf `keyup`)
 - Suche in Paketnamen und Beschreibungen
 
-**US-4: Fehlerbehandlung**
-- Paket nicht gefunden → Error-Seite
-- Ungültige Parameter → Error-Seite
+**US-4: Fehlerbehandlung** ✅
+- Paket nicht gefunden → Error-Seite (P3)
+- Manipulierte URL-Parameter → von APEX abgewiesen (Page Access Protection mit Checksumme)
 
 ### APEX Seiten
 
 | Seite | Name | Typ | Inhalt |
 |-------|------|-----|--------|
-| P1 | Home / Package List | Interactive Report | Alle Pakete, Suchfeld, Link zu P2 |
-| P2 | Package Details | Multiple Regions | Overview, Functions, Procedures |
-| P3 | Error | Static Content | "Package not found" |
+| P1 | Package Browser | Interactive Report | Alle Pakete, Suchfeld, Link zu P2 |
+| P2 | Package Details | Dynamic Content | Doku aus `ocd_apex_util.package_html`, JSON-Quelle zum Aufklappen |
+| P3 | Error | Static Content | „Package not found or not documented“ |
 
 ### SQL-Queries
 
-**Paketliste:**
+**Paketliste (P1):**
 ```sql
-SELECT 
-  json_value(pkg_data, '$.name') as name,
-  json_value(pkg_data, '$.description') as description,
-  json_value(pkg_data, '$.status') as status
-FROM v_ocd_packages
-ORDER BY name;
+select object_name,
+       json_value(pkg_data, '$.name') as name,
+       json_value(pkg_data, '$.desc') as description
+  from ocd_apex_package_docs;
 ```
 
-**Package-Details:**
+**Package-Details (P2):**
 ```sql
-SELECT pkg_data 
-FROM v_ocd_packages 
-WHERE json_value(pkg_data, '$.name') = :P2_PACKAGE_NAME;
+select ocd_apex_util.package_html(:P2_PACKAGE_NAME) from dual;
 ```
 
-**Funktionen aus Package:**
+**Komponenten eines Packages:**
 ```sql
-SELECT 
-  json_value(func, '$.name') as name,
-  json_value(func, '$.description') as description,
-  json_value(func, '$.return_type') as return_type,
-  json_query(func, '$.parameters') as parameters
-FROM v_ocd_packages,
-  JSON_TABLE(pkg_data, '$.functions[*]' COLUMNS (func PATH '$'))
-WHERE json_value(pkg_data, '$.name') = :P2_PACKAGE_NAME
-ORDER BY name;
+select comp_name, comp_type, comp_desc, syntax
+  from ocd_apex_components
+ where object_name = :P2_PACKAGE_NAME
+ order by comp_seq;
 ```
 
-## Phase 2: Erweiterungen (optional)
+## Weitere Ideen
 
-- [ ] Syntax-Highlighting für PL/SQL Parameter-Types
-- [ ] Hierarchie-View (Baum-Struktur für Funktionen/Prozeduren)
+**Darstellung**
+- [ ] Syntax-Highlighting für Syntax und Examples
+- [ ] Hierarchie-View (Baum-Struktur für Komponenten)
+- [ ] Deprecation-Hinweise anzeigen (`pragma deprecate`); setzt voraus, dass `ocd.api.information` sie im JSON liefert
+- [ ] Packages anderer Schemas anzeigen (bisher nur `user_objects` des OCD Schemas)
+
+**Performance**
+
+Jede Abfrage auf `ocd_apex_package_docs` ruft `ocd.api.information` einmal je Package auf, P1 also für alle Packages des Schemas. Für kleine bis mittlere Schemas reicht das.
+- [ ] JSON in einer Tabelle cachen, aktualisiert nach `inspect`
+- [ ] alternativ Materialized View mit regelmäßigem Refresh
+- [ ] HTTP-Caching, falls eine REST-API dazukommt
+
+**Export und Schnittstellen**
 - [ ] PDF/HTML-Export
 - [ ] REST-API über ORDS
 
-## Phase 3: Bearbeitung (optional)
-
-- [ ] Beschreibungen editierbar in APEX
-- [ ] Speichern zurück in ocd-Datenstrukturen
+**Bearbeitung**
+- [ ] Beschreibungen in APEX bearbeiten
+- [ ] Speichern über `content_revision` (`modified_comment_or_code`, `priority_fl`), das `ocd.api.information` bereits auswertet
 - [ ] Versioning für Package-Snapshots
-
-## Zeitplan
-
-- **Week 1**: DB-Setup (✅) + APEX-Grundgerüst
-- **Week 2**: P1 (List) + P2 (Details)
-- **Week 3**: P3 (Error) + Suchfunktion + Testing
-- **Week 4+**: Polishing, Phase 2 Features
