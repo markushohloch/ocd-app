@@ -33,7 +33,7 @@ page 1 (
             htmlCode:
                 ```html
                 <p>Technical documentation of the PL/SQL packages in the selected schemas, generated on the fly by <a href="https://github.com/yerba1704/ocd" target="_blank" rel="noopener">ora* CODEDOC</a>.</p>
-                <p>Source code and installation of this application: <a href="https://github.com/yerba1704/ocd-apex" target="_blank" rel="noopener"><span class="fa fa-github" aria-hidden="true"></span> yerba1704/ocd-apex</a></p>
+                <p>Source code and installation of this application: <a href="https://github.com/markushohloch/ocd-app" target="_blank" rel="noopener"><span class="fa fa-github" aria-hidden="true"></span> markushohloch/ocd-app</a></p>
                 ```
         }
         layout {
