@@ -41,6 +41,11 @@ Besides the APEX application, the documentation is also available as REST servic
 | `GET .../ords/<schema-alias>/docs/packages/` | All packages of the selected schemas with schema, name and description |
 | `GET .../ords/<schema-alias>/docs/packages/:name` | The JSON output of `ocd.api.information` for a single package (`404` if the package does not exist); the optional parameter `schema` selects the schema, default is `OCD` |
 
+Examples from the live demo:
+
+- All packages: https://sf0e2zmteguh3bs-hoh.adb.eu-frankfurt-1.oraclecloudapps.com/ords/ocd/docs/packages/
+- Package `PKG_SAMPLE` of schema `OCD_DEMO`: https://sf0e2zmteguh3bs-hoh.adb.eu-frankfurt-1.oraclecloudapps.com/ords/ocd/docs/packages/pkg_sample?schema=ocd_demo
+
 ```shell
 curl https://<host>/ords/ocd/docs/packages/pkg_sample?schema=ocd_demo
 ```
