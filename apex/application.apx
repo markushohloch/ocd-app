@@ -1,5 +1,5 @@
-app OCD_APEX (
-    name: ora* CODEDOC - Package Browser
+app OCD_APEX_PUBLIC (
+    name: ora* CODEDOC - Package Browser (Public)
     logo {
         type: text
         text: ora* CODEDOC - Package Browser
@@ -15,8 +15,6 @@ app OCD_APEX (
     navigationMenu {
         listTemplate: @/side-navigation-menu
         templateOptions: [
-            #DEFAULT#
-            js-defaultCollapsed
             js-navCollapsed--hidden
             t-TreeNav--styleA
         ]
@@ -42,7 +40,7 @@ app OCD_APEX (
         scheme: @oracle-apex-accounts
     }
     sessionStateProtection {
-        checksumSalt: 2C1EF0EA2C94FF0FF807ED7516AD4288145E42335901216491C27C74FCE89DAF
+        checksumSalt: F2283B3A26F26B31D4B87BFE801760D7646A8DD155ACB78F5BC0DFA01E2B8327
     }
     runtime {
         allowFeedback: true

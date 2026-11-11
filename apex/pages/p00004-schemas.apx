@@ -74,10 +74,11 @@ page 4 (
             type: sqlQuery
             sqlQuery:
                 ```sql
+                -- Demo: only the schemas of ora* CODEDOC and ora* CODECOP
                 select username as d,
                        username as r
                   from all_users
-                 where oracle_maintained = 'N'
+                 where username in ('OCD', 'OCD_DEMO', 'OCC')
                  order by username
                 ```
         }
@@ -136,11 +137,11 @@ page 4 (
                          select column_value
                            from apex_string.split(:P4_SCHEMAS, ':'));
 
-                -- Only existing schemas that are not maintained by Oracle
+                -- Demo: only the schemas of ora* CODEDOC and ora* CODECOP
                 insert into ocd_apex_schema (schema_name)
                 select username
                   from all_users
-                 where oracle_maintained = 'N'
+                 where username in ('OCD', 'OCD_DEMO', 'OCC')
                    and username in (
                          select column_value
                            from apex_string.split(:P4_SCHEMAS, ':'))

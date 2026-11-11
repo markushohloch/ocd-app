@@ -10,6 +10,7 @@ page 3 (
         cursorFocus: doNotFocusCursor
     }
     security {
+        authentication: public
         pageAccessProtection: argumentsMustHaveChecksum
         formAutoComplete: false
     }

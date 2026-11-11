@@ -1,6 +1,24 @@
 list navigation-bar (
     name: Navigation Bar
 
+    entry sign-in (
+        label: Sign In
+        icon {
+            imageIconCssClasses: fa-sign-in
+        }
+        layout {
+            sequence: 5
+        }
+        link {
+            target: {
+                page: LOGIN
+            }
+        }
+        serverSideCondition {
+            type: userIsPublicUser
+        }
+    )
+
     entry app-user (
         label: &APP_USER.
         icon {
@@ -17,6 +35,9 @@ list navigation-bar (
         }
         userDefinedAttributes {
             2: has-username
+        }
+        serverSideCondition {
+            type: userIsAuthenticated
         }
     )
 
@@ -61,50 +82,68 @@ list navigation-bar (
 
 list navigation-menu (
     name: Navigation Menu
-
-    entry home (
-        label: Home
-        icon {
-            imageIconCssClasses: fa-home
-        }
-        layout {
-            sequence: 10
-        }
-        isCurrent {
-            type: pages
-            pages: [
-                1
-                2
-                3
-            ]
-        }
-        link {
-            target: {
-                page: 1
-            }
-        }
-    )
-
-    entry schemas (
-        label: Schemas
-        icon {
-            imageIconCssClasses: fa-database
-        }
-        layout {
-            sequence: 20
-        }
-        isCurrent {
-            type: pages
-            pages: [
-                4
-            ]
-        }
-        link {
-            target: {
-                page: 4
-            }
-        }
-    )
-
+    source {
+        type: sqlQuery
+        sqlQuery:
+            ```sql
+            -- Home, the schema settings for signed in users and all packages
+            -- of the selected schemas below their schema, the current page is highlighted.
+            -- A schema links to the package browser filtered by this schema.
+            select lvl, label, target, is_current, image
+              from (
+                select 1 as lvl,
+                       'Home' as label,
+                       apex_page.get_url(p_page => 1, p_clear_cache => 1) as target,
+                       case when :APP_PAGE_ID = 1 and :P1_SCHEMA_NAME is null then 'YES' else 'NO' end as is_current,
+                       'fa-home' as image,
+                       0 as sort_group,
+                       null as schema_name,
+                       0 as sort_order
+                  from dual
+                union all
+                select 1,
+                       'Schemas',
+                       apex_page.get_url(p_page => 4),
+                       case when :APP_PAGE_ID = 4 then 'YES' else 'NO' end,
+                       'fa-database',
+                       1,
+                       null,
+                       0
+                  from dual
+                 where :APP_USER <> 'nobody'
+                union all
+                select 1,
+                       schema_name,
+                       apex_page.get_url(
+                         p_page        => 1,
+                         p_clear_cache => 1,
+                         p_items       => 'P1_SCHEMA_NAME',
+                         p_values      => schema_name),
+                       case when :APP_PAGE_ID = 1 and schema_name = :P1_SCHEMA_NAME then 'YES' else 'NO' end,
+                       'fa-folder-o',
+                       2,
+                       schema_name,
+                       0
+                  from ocd_apex_schema
+                union all
+                select 2,
+                       p.column_value,
+                       apex_page.get_url(
+                         p_page   => 2,
+                         p_items  => 'P2_SCHEMA_NAME,P2_PACKAGE_NAME',
+                         p_values => s.schema_name || ',' || p.column_value),
+                       case when :APP_PAGE_ID = 2
+                             and s.schema_name = :P2_SCHEMA_NAME
+                             and p.column_value = :P2_PACKAGE_NAME
+                            then 'YES' else 'NO' end,
+                       'fa-cube',
+                       2,
+                       s.schema_name,
+                       1
+                  from ocd_apex_schema s,
+                       table(ocd_apex_util.package_names(s.schema_name)) p
+              )
+             order by sort_group, schema_name, sort_order, label
+            ```
+    }
 )
-

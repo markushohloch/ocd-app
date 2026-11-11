@@ -1,15 +1,14 @@
-<p>
-  <img src="https://img.shields.io/badge/Status-Work%20In%20Progress-yellow?style=flat-square" alt="Work in progress...">
-</p>
-
-# ocd-apex
+# ocd-app
 
 ## Introduction
 
-__ocd-apex__ is an [APEX](https://www.oracle.com/apex/) application to browse the technical documentation of PL/SQL packages created by [ora* CODEDOC](https://github.com/yerba1704/ocd).
+__ocd-app__ is an example of how to integrate [ora* CODEDOC](https://github.com/yerba1704/ocd) into [APEX](https://www.oracle.com/apex/) and [ORDS](https://www.oracle.com/database/technologies/appdev/rest.html): an APEX application and a REST service to browse the technical documentation of PL/SQL packages.
 It is an __ora* CODEDOC publisher (OCDp)__ and renders the JSON output of `ocd.api.information` in a format similar to Oracle’s [Database PL/SQL Packages](https://docs.oracle.com/en/database/oracle/oracle-database/26/arpls/) reference.
 
-The application consists of three pages:
+- __Live demo__: https://sf0e2zmteguh3bs-hoh.adb.eu-frankfurt-1.oraclecloudapps.com/ords/r/ocd/ocd_apex_public/
+- __Download__: [latest release](https://github.com/markushohloch/ocd-app/releases/latest) or clone this repository
+
+The application consists of four pages:
 
 - __Package Browser__ lists all packages of the selected schemas, including their description, and can be filtered by name or description.
 
@@ -50,7 +49,7 @@ curl https://<host>/ords/ocd/docs/packages/pkg_sample?schema=ocd_demo
 
 ## Installation
 
-__ora* CODEDOC__ must be installed first. All objects of __ocd-apex__ are installed in the `OCD` schema.
+__ora* CODEDOC__ must be installed first. All objects of __ocd-app__ are installed in the `OCD` schema.
 
 1. create the database objects (table `ocd_apex_schema`, views and package `ocd_apex_util`) with [SQLcl](https://www.oracle.com/database/sqldeveloper/technologies/sqlcl/) connected as `OCD`:
 
@@ -91,4 +90,4 @@ The application is stored in the [APEXlang](https://docs.oracle.com/en/database/
 
 ## License
 
-__ocd-apex__ is released under the [MIT license](LICENSE).
+__ocd-app__ is released under the [MIT license](LICENSE).

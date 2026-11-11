@@ -1,4 +1,4 @@
-# ocd-apex – Projektplan
+# ocd-app – Projektplan
 
 ## Architektur
 
@@ -12,7 +12,7 @@ Oracle Cloud Database
     │   ├── ocd_apex_components        ($.components[*] als Zeilen)
     │   └── ocd_apex_component_params  ($.components[*].parameters[*] als Zeilen)
     ├── Package ocd_apex_util          (Inspect-Helfer, HTML-Rendering der Doku)
-    └── APEX Application 128
+    └── APEX Application 129 (Alias OCD_APEX_PUBLIC, Seiten öffentlich, „Schemas“ nur nach Login)
 ```
 
 **Prinzip**: Alles im OCD Schema, keine Synonyme, direkte Zugriffe.
@@ -118,9 +118,8 @@ Jede Abfrage auf `ocd_apex_package_docs` ruft `ocd.api.information` einmal je Pa
 
 **Export und Schnittstellen**
 - [ ] PDF/HTML-Export
-- [ ] REST-API über ORDS
+- [x] REST-API über ORDS (Modul `ocd.docs`)
 
 **Bearbeitung**
-- [ ] Beschreibungen in APEX bearbeiten
-- [ ] Speichern über `content_revision` (`modified_comment_or_code`, `priority_fl`), das `ocd.api.information` bereits auswertet
-- [ ] Versioning für Package-Snapshots
+
+Bearbeiten und Freigeben der Doku (Beschreibungen übersteuern, Lücken füllen, Sichtbarkeit steuern) ist Gegenstand von [yerba1704/ocd-apex](https://github.com/yerba1704/ocd-apex), nicht von ocd-app.

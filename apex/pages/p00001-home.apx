@@ -10,7 +10,18 @@ page 1 (
         cursorFocus: doNotFocusCursor
         warnOnUnsavedChanges: false
     }
+    css {
+        inline:
+            ```css
+            /* Not "disabled": Universal Theme sets pointer-events: none, which hides the tooltip */
+            .t-Button[aria-disabled="true"] {
+              opacity: .5;
+              cursor: not-allowed;
+            }
+            ```
+    }
     security {
+        authentication: public
         pageAccessProtection: argumentsMustHaveChecksum
         formAutoComplete: false
     }
@@ -18,16 +29,23 @@ page 1 (
     region ora-codedoc-package-browser (
         name: ora* CODEDOC - Package Browser
         type: staticContent
+        source {
+            htmlCode:
+                ```html
+                <p>Technical documentation of the PL/SQL packages in the selected schemas, generated on the fly by <a href="https://github.com/yerba1704/ocd" target="_blank" rel="noopener">ora* CODEDOC</a>.</p>
+                <p>Source code and installation of this application: <a href="https://github.com/yerba1704/ocd-apex" target="_blank" rel="noopener"><span class="fa fa-github" aria-hidden="true"></span> yerba1704/ocd-apex</a></p>
+                ```
+        }
         layout {
             sequence: 10
             slot: breadcrumbBar
         }
         appearance {
             template: @/hero
-            templateOptions: #DEFAULT#
-        }
-        image {
-            fileUrl: #APP_FILES#icons/app-icon-512.png
+            templateOptions: [
+                #DEFAULT#
+                t-HeroRegion--hideIcon
+            ]
         }
     )
 
@@ -282,6 +300,34 @@ page 1 (
         behavior {
             warnOnUnsavedChanges: doNotCheck
         }
+        serverSideCondition {
+            type: userIsAuthenticated
+        }
+        security {
+            authorizationScheme: mustNotBePublicUser
+        }
+    )
+
+    button inspect-all-disabled (
+        buttonName: INSPECT_ALL_DISABLED
+        label: Inspect all packages
+        layout {
+            sequence: 41
+            slot: body
+        }
+        appearance {
+            buttonTemplate: @/text
+            templateOptions: #DEFAULT#
+        }
+        behavior {
+            action: definedByDynamicAction
+        }
+        advanced {
+            customAttributes: aria-disabled="true" title="Sign in to inspect all packages"
+        }
+        serverSideCondition {
+            type: userIsPublicUser
+        }
     )
 
     dynamicAction refresh-packages-report (
@@ -351,6 +397,9 @@ page 1 (
         }
         serverSideCondition {
             whenButtonPressed: @inspect-all
+        }
+        security {
+            authorizationScheme: mustNotBePublicUser
         }
     )
 

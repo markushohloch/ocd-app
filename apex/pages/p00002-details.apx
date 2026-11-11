@@ -131,6 +131,7 @@ page 2 (
             ```
     }
     security {
+        authentication: public
         pageAccessProtection: argumentsMustHaveChecksum
         formAutoComplete: false
     }
