@@ -1,0 +1,25 @@
+-- Table: ocd_apex_schema
+-- Schemas, deren Packages die APEX-Applikation anzeigt und dokumentiert.
+-- Bei der ersten Installation wird das eigene Schema eingetragen; erneute
+-- Installationen lassen Tabelle und Inhalt unveraendert.
+
+DECLARE
+  e_table_exists EXCEPTION;
+  PRAGMA EXCEPTION_INIT(e_table_exists, -955);
+BEGIN
+  EXECUTE IMMEDIATE q'[
+    CREATE TABLE ocd_apex_schema (
+      schema_name VARCHAR2(128 CHAR)
+        CONSTRAINT oas_schema_name_p PRIMARY KEY
+        CONSTRAINT oas_schema_name_uc_c CHECK (schema_name = UPPER(schema_name))
+    )]';
+  EXECUTE IMMEDIATE q'[COMMENT ON TABLE ocd_apex_schema IS 'Schemas whose packages are shown and inspected by the ocd-apex application.']';
+  EXECUTE IMMEDIATE q'[COMMENT ON COLUMN ocd_apex_schema.schema_name IS 'The name of the schema.']';
+  EXECUTE IMMEDIATE 'INSERT INTO ocd_apex_schema (schema_name) VALUES (USER)';
+  COMMIT;
+EXCEPTION WHEN e_table_exists THEN
+  NULL;
+END;
+/
+
+PROMPT Table ocd_apex_schema created successfully.

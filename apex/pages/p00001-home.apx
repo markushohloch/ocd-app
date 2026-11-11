@@ -40,20 +40,25 @@ page 1 (
             sqlQuery:
                 ```sql
                 select 
+                    schema_name,
                     object_name,
                     json_value(pkg_data, '$.name') as name,
                     json_value(pkg_data, '$.desc') as description,
                     pkg_data
                 from ocd_apex_package_docs
-                where :P1_SEARCH IS null
+                where (:P1_SCHEMA_NAME is null or schema_name = :P1_SCHEMA_NAME)
+                and (:P1_SEARCH IS null
                 or upper(json_value(pkg_data, '$.name')) like upper('%' || :P1_SEARCH || '%')
-                or upper(json_value(pkg_data, '$.desc')) like upper('%' || :P1_SEARCH || '%')
+                or upper(json_value(pkg_data, '$.desc')) like upper('%' || :P1_SEARCH || '%'))
                 
                 
                 
                 
                 ```
-            pageItemsToSubmit: P1_SEARCH
+            pageItemsToSubmit: [
+                P1_SCHEMA_NAME
+                P1_SEARCH
+            ]
         }
         layout {
             sequence: 30
@@ -71,10 +76,12 @@ page 1 (
             target: {
                 page: 2
                 items: {
+                    P2_SCHEMA_NAME: #SCHEMA_NAME#
                     P2_PACKAGE_NAME: #OBJECT_NAME#
                 }
                 clearCache: 2
             }
+            linkIcon: <span class="fa fa-search" aria-hidden="true"></span>
         }
         pagination {
             type: rowRangesXToY
@@ -159,6 +166,22 @@ page 1 (
             }
         )
 
+        column SCHEMA_NAME (
+            type: plainText
+            heading {
+                heading: Schema
+            }
+            layout {
+                sequence: 5
+            }
+            source {
+                dataType: STRING
+            }
+            advanced {
+                endUserAlias: E
+            }
+        )
+
         page {
             borderWidth: 0.5
             borderColor: #666666
@@ -171,14 +194,18 @@ page 1 (
             }
 
             displayColumn DESCRIPTION (
-                sequence: 3
+                sequence: 4
             )
 
             displayColumn NAME (
-                sequence: 2
+                sequence: 3
             )
 
             displayColumn OBJECT_NAME (
+                sequence: 2
+            )
+
+            displayColumn SCHEMA_NAME (
                 sequence: 1
             )
 
@@ -208,6 +235,39 @@ page 1 (
         }
     )
 
+    pageItem P1_SCHEMA_NAME (
+        type: selectList
+        label {
+            label: Schema
+            alignment: left
+        }
+        lov {
+            type: sqlQuery
+            sqlQuery:
+                ```sql
+                select schema_name as d,
+                       schema_name as r
+                  from ocd_apex_schema
+                 order by schema_name
+                ```
+            displayExtraValues: false
+            nullDisplayValue: - All Schemas -
+        }
+        layout {
+            sequence: 25
+            slot: body
+            startNewRow: false
+            alignment: left
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        help {
+            helpText: Show only the packages of this schema
+        }
+    )
+
     button inspect-all (
         buttonName: INSPECT_ALL
         label: Inspect all packages
@@ -233,6 +293,31 @@ page 1 (
             event: keyup
             selectionType: items
             items: P1_SEARCH
+        }
+
+        action native-refresh (
+            action: refresh
+            affectedElements {
+                selectionType: region
+                region: @packages
+            }
+            execution {
+                sequence: 10
+                fireOnInit: false
+            }
+        )
+
+    )
+
+    dynamicAction refresh-packages-report-on-schema (
+        name: Refresh Packages Report on Schema
+        execution {
+            sequence: 20
+        }
+        when {
+            event: change
+            selectionType: items
+            items: P1_SCHEMA_NAME
         }
 
         action native-refresh (

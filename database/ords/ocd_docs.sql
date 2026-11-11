@@ -2,8 +2,11 @@
 -- Stellt die Dokumentation aus ora* CODEDOC per REST bereit, unabhaengig von den APEX-Apps.
 -- Ausfuehren im OCD Schema; das Schema muss fuer ORDS aktiviert sein (ords.enable_schema).
 --
---   GET .../ords/<schema-alias>/docs/packages/        Liste aller Packages (name, desc)
---   GET .../ords/<schema-alias>/docs/packages/:name   JSON aus ocd.api.information, 404 falls unbekannt
+--   GET .../ords/<schema-alias>/docs/packages/        Liste aller Packages (schema, name, desc)
+--   GET .../ords/<schema-alias>/docs/packages/:name   JSON aus ocd.api.information, 404 falls unbekannt;
+--                                                     ?schema=<name> waehlt das Schema, Standard ist OCD
+--
+-- Es gelten die Schemas aus ocd_apex_schema.
 --
 -- Die Endpunkte sind oeffentlich lesbar.
 
@@ -18,7 +21,7 @@ BEGIN
   ords.define_template(
     p_module_name => 'ocd.docs',
     p_pattern     => 'packages/',
-    p_comments    => 'All packages of the schema');
+    p_comments    => 'All packages of the selected schemas');
 
   ords.define_handler(
     p_module_name    => 'ocd.docs',
@@ -27,10 +30,11 @@ BEGIN
     p_source_type    => ords.source_type_collection_feed,
     p_items_per_page => 25,
     p_source         => q'[
-select object_name                    as name,
+select schema_name                    as schema,
+       object_name                    as name,
        json_value(pkg_data, '$.desc') as "desc"
   from ocd_apex_package_docs
- order by object_name]');
+ order by schema_name, object_name]');
 
   ords.define_template(
     p_module_name => 'ocd.docs',
@@ -44,22 +48,16 @@ select object_name                    as name,
     p_source_type => ords.source_type_plsql,
     p_source      => q'[
 declare
-  v_count  pls_integer;
+  v_schema varchar2(128) := upper(nvl(:schema, user));
   v_json   clob;
   v_offset pls_integer := 1;
 begin
-  select count(*)
-    into v_count
-    from user_objects
-   where object_type = 'PACKAGE'
-     and object_name = upper(:name);
-
-  if v_count = 0 then
+  if not ocd_apex_util.is_package(:name, v_schema) then
     :status_code := 404;
     return;
   end if;
 
-  v_json := ocd.api.information(upper(:name), 'OCD');
+  v_json := ocd.api.information(upper(:name), v_schema);
 
   owa_util.mime_header('application/json', true, 'UTF-8');
   while v_offset <= dbms_lob.getlength(v_json) loop

@@ -36,44 +36,73 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
   TYPE t_component_tab IS TABLE OF t_component;
 
 
+  FUNCTION package_names(i_schema_name IN VARCHAR2) RETURN sys.odcivarchar2list IS
+    -- Comma separated, with a trailing comma; NULL if there is no package.
+    -- The source code is read from the dictionary by the role of OCD.WORKER.
+    v_list  CLOB := ocd.worker.schema_packages(UPPER(i_schema_name));
+    v_names sys.odcivarchar2list := sys.odcivarchar2list();
+
+  BEGIN
+    FOR i IN 1 .. NVL(REGEXP_COUNT(v_list, '[^,]+'), 0) LOOP
+      v_names.EXTEND;
+      v_names(i) := REGEXP_SUBSTR(v_list, '[^,]+', 1, i);
+    END LOOP;
+
+    RETURN v_names;
+
+  END package_names;
+
+
+  FUNCTION is_package(
+    i_package_name IN VARCHAR2,
+    i_schema_name  IN VARCHAR2 DEFAULT USER
+  ) RETURN BOOLEAN IS
+    v_count PLS_INTEGER;
+
+  BEGIN
+    SELECT COUNT(*)
+    INTO v_count
+    FROM ocd_apex_schema s,
+         TABLE(package_names(s.schema_name)) p
+    WHERE s.schema_name  = UPPER(i_schema_name)
+      AND p.column_value = UPPER(i_package_name);
+
+    RETURN v_count > 0;
+
+  END is_package;
+
+
   PROCEDURE inspect_all_packages IS
-    v_package_code CLOB;
-    v_package_name VARCHAR2(128);
     v_count PLS_INTEGER := 0;
     v_errors PLS_INTEGER := 0;
-    
+
     CURSOR c_packages IS
-      SELECT object_name 
-      FROM user_objects 
-      WHERE object_type = 'PACKAGE' 
-        AND status = 'VALID'
-      ORDER BY object_name;
-      
+      SELECT s.schema_name, p.column_value AS package_name
+      FROM ocd_apex_schema s,
+           TABLE(package_names(s.schema_name)) p
+      ORDER BY s.schema_name, p.column_value;
+
   BEGIN
     DBMS_OUTPUT.PUT_LINE('Starting documentation of all packages...');
     DBMS_OUTPUT.PUT_LINE('=============================================');
-    
+
     FOR r_pkg IN c_packages LOOP
-      v_package_name := r_pkg.object_name;
-      
       BEGIN
-        -- Get Package-Spec DDL
-        v_package_code := dbms_metadata.get_ddl('PACKAGE_SPEC', v_package_name);
-        
-        -- Inspect with ocd.api
+        -- Inspect the package specification with ocd.api
         ocd.api.inspect(
-          i_package_code => v_package_code,
-          i_package_name => v_package_name
+          i_package_code => ocd.worker.object_code(r_pkg.schema_name, r_pkg.package_name),
+          i_package_name => r_pkg.package_name,
+          i_schema_name  => r_pkg.schema_name
         );
-        
+
         v_count := v_count + 1;
-        DBMS_OUTPUT.PUT_LINE('✓ Documented: ' || v_package_name);
-        
+        DBMS_OUTPUT.PUT_LINE('✓ Documented: ' || r_pkg.schema_name || '.' || r_pkg.package_name);
+
       EXCEPTION WHEN OTHERS THEN
         v_errors := v_errors + 1;
-        DBMS_OUTPUT.PUT_LINE('✗ Error for ' || v_package_name || ': ' || SQLERRM);
+        DBMS_OUTPUT.PUT_LINE('✗ Error for ' || r_pkg.schema_name || '.' || r_pkg.package_name || ': ' || SQLERRM);
       END;
-      
+
     END LOOP;
     
     COMMIT;
@@ -87,38 +116,33 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
   END inspect_all_packages;
 
   
-  PROCEDURE inspect_package(i_package_name IN VARCHAR2) IS
-    v_package_code CLOB;
-    v_exists PLS_INTEGER;
-    
+  PROCEDURE inspect_package(
+    i_package_name IN VARCHAR2,
+    i_schema_name  IN VARCHAR2 DEFAULT USER
+  ) IS
+    v_package_name VARCHAR2(128) := UPPER(i_package_name);
+    v_schema_name  VARCHAR2(128) := UPPER(i_schema_name);
+
   BEGIN
-    -- Check if package exists
-    SELECT COUNT(*)
-    INTO v_exists
-    FROM user_objects
-    WHERE object_name = UPPER(i_package_name)
-      AND object_type = 'PACKAGE';
-    
-    IF v_exists = 0 THEN
+    IF NOT is_package(v_package_name, v_schema_name) THEN
       RAISE_APPLICATION_ERROR(
         -20001,
-        'Package ' || i_package_name || ' not found in current schema'
+        'Package ' || v_schema_name || '.' || v_package_name
+          || ' not found in the schemas of OCD_APEX_SCHEMA'
       );
     END IF;
-    
-    -- Get Package-Spec DDL
-    v_package_code := dbms_metadata.get_ddl('PACKAGE_SPEC', UPPER(i_package_name));
-    
-    -- Inspect with ocd.api
+
+    -- Inspect the package specification with ocd.api
     ocd.api.inspect(
-      i_package_code => v_package_code,
-      i_package_name => UPPER(i_package_name)
+      i_package_code => ocd.worker.object_code(v_schema_name, v_package_name),
+      i_package_name => v_package_name,
+      i_schema_name  => v_schema_name
     );
-    
+
     COMMIT;
-    
-    DBMS_OUTPUT.PUT_LINE('✓ Package ' || UPPER(i_package_name) || ' documented successfully');
-    
+
+    DBMS_OUTPUT.PUT_LINE('✓ Package ' || v_schema_name || '.' || v_package_name || ' documented successfully');
+
   END inspect_package;
 
   
@@ -138,7 +162,8 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
 
   FUNCTION params_md(
     i_object_name IN VARCHAR2,
-    i_comp_name   IN VARCHAR2
+    i_comp_name   IN VARCHAR2,
+    i_schema_name IN VARCHAR2 DEFAULT USER
   ) RETURN CLOB IS
     v_result CLOB;
     v_line   VARCHAR2(4200);
@@ -147,7 +172,8 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
     FOR r_param IN (
       SELECT param_name, param_desc
       FROM ocd_apex_component_params
-      WHERE object_name = i_object_name
+      WHERE schema_name = UPPER(i_schema_name)
+        AND object_name = i_object_name
         AND comp_name   = i_comp_name
       ORDER BY param_seq
     ) LOOP
@@ -168,25 +194,6 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
     RETURN v_result;
 
   END params_md;
-
-
-  -- Private function.
-  -- Checks whether a package exists in the current schema.
-  -- The return value is `TRUE` if the package exists, whatever its status.
-  -- @The name of the package, case is ignored.
-  FUNCTION is_package(i_name IN VARCHAR2) RETURN BOOLEAN IS
-    v_count PLS_INTEGER;
-
-  BEGIN
-    SELECT COUNT(*)
-    INTO v_count
-    FROM user_objects
-    WHERE object_type = 'PACKAGE'
-      AND object_name = UPPER(i_name);
-
-    RETURN v_count > 0;
-
-  END is_package;
 
 
   -- Private function.
@@ -213,12 +220,16 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
   -- The return value contains the checksum required by the page, as long as
   -- it is called within an APEX session.
   -- @The name of the package, case is ignored.
-  FUNCTION package_url(i_package_name IN VARCHAR2) RETURN VARCHAR2 IS
+  -- @The name of the schema, case is ignored.
+  FUNCTION package_url(
+    i_package_name IN VARCHAR2,
+    i_schema_name  IN VARCHAR2
+  ) RETURN VARCHAR2 IS
   BEGIN
     RETURN apex_page.get_url(
       p_page   => c_details_page,
-      p_items  => 'P2_PACKAGE_NAME',
-      p_values => UPPER(i_package_name));
+      p_items  => 'P2_SCHEMA_NAME,P2_PACKAGE_NAME',
+      p_values => UPPER(i_schema_name) || ',' || UPPER(i_package_name));
   END package_url;
 
 
@@ -227,51 +238,58 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
   --
   -- Supported forms are `PACKAGE`, `COMPONENT`, `PACKAGE.COMPONENT`,
   -- `SCHEMA.PACKAGE` and `SCHEMA.PACKAGE.COMPONENT`. A single name is taken
-  -- as package if such a package exists, otherwise as component of the current
-  -- package. The schema is ignored, because only packages of the current
-  -- schema are shown. References to the current package link to the anchor
-  -- on the same page.
-  -- The return value is a `code` element if the package does not exist.
+  -- as package if such a package exists in the current schema, otherwise as
+  -- component of the current package. Two names are taken as package and
+  -- component if the first one is a package of the current schema, otherwise
+  -- as schema and package. References to the current package link to the
+  -- anchor on the same page.
+  -- The return value is a `code` element if the package is not shown by the
+  -- application, see [[IS_PACKAGE]].
   -- @The reference without the square brackets.
   -- @The package of the text that contains the reference.
+  -- @The schema of the text that contains the reference.
   FUNCTION reference_html(
     i_ref          IN VARCHAR2,
-    i_package_name IN VARCHAR2
+    i_package_name IN VARCHAR2,
+    i_schema_name  IN VARCHAR2
   ) RETURN VARCHAR2 IS
     v_parts   PLS_INTEGER := REGEXP_COUNT(i_ref, '[^.]+');
     v_part1   VARCHAR2(128) := UPPER(REGEXP_SUBSTR(i_ref, '[^.]+', 1, 1));
     v_part2   VARCHAR2(128) := UPPER(REGEXP_SUBSTR(i_ref, '[^.]+', 1, 2));
     v_part3   VARCHAR2(128) := UPPER(REGEXP_SUBSTR(i_ref, '[^.]+', 1, 3));
+    v_schema  VARCHAR2(128) := UPPER(i_schema_name);
     v_package VARCHAR2(128);
     v_comp    VARCHAR2(128);
     v_url     VARCHAR2(4000);
 
   BEGIN
     IF v_parts = 3 THEN
+      v_schema  := v_part1;
       v_package := v_part2;
       v_comp    := v_part3;
-    ELSIF v_parts = 2 AND is_package(v_part1) THEN
+    ELSIF v_parts = 2 AND is_package(v_part1, v_schema) THEN
       v_package := v_part1;
       v_comp    := v_part2;
     ELSIF v_parts = 2 THEN
+      v_schema  := v_part1;
       v_package := v_part2;
-    ELSIF is_package(v_part1) THEN
+    ELSIF is_package(v_part1, v_schema) THEN
       v_package := v_part1;
     ELSE
       v_package := UPPER(i_package_name);
       v_comp    := v_part1;
     END IF;
 
-    IF v_package IS NULL OR NOT is_package(v_package) THEN
+    IF v_package IS NULL OR NOT is_package(v_package, v_schema) THEN
       RETURN '<code>' || i_ref || '</code>';
     END IF;
 
     IF v_comp IS NULL THEN
-      v_url := package_url(v_package);
-    ELSIF v_package = UPPER(i_package_name) THEN
+      v_url := package_url(v_package, v_schema);
+    ELSIF v_package = UPPER(i_package_name) AND v_schema = UPPER(i_schema_name) THEN
       v_url := '#' || anchor_id(v_comp);
     ELSE
-      v_url := package_url(v_package) || '#' || anchor_id(v_comp);
+      v_url := package_url(v_package, v_schema) || '#' || anchor_id(v_comp);
     END IF;
 
     RETURN '<a href="' || v_url || '">' || i_ref || '</a>';
@@ -281,7 +299,8 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
 
   FUNCTION text_html(
     i_text         IN CLOB,
-    i_package_name IN VARCHAR2 DEFAULT NULL
+    i_package_name IN VARCHAR2 DEFAULT NULL,
+    i_schema_name  IN VARCHAR2 DEFAULT USER
   ) RETURN CLOB IS
     c_ref_pattern CONSTANT VARCHAR2(50) := '\[\[([A-Za-z0-9_$#.]+)\]\]';
     v_html  CLOB;
@@ -322,7 +341,7 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
       EXIT WHEN v_start = 0;
       v_end := REGEXP_INSTR(v_html, c_ref_pattern, 1, 1, 1);
       v_html := SUBSTR(v_html, 1, v_start - 1)
-        || reference_html(REGEXP_SUBSTR(v_html, c_ref_pattern, 1, 1, NULL, 1), i_package_name)
+        || reference_html(REGEXP_SUBSTR(v_html, c_ref_pattern, 1, 1, NULL, 1), i_package_name, i_schema_name)
         || SUBSTR(v_html, v_end);
     END LOOP;
 
@@ -334,8 +353,12 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
   END text_html;
 
 
-  FUNCTION package_html(i_package_name IN VARCHAR2) RETURN CLOB IS
+  FUNCTION package_html(
+    i_package_name IN VARCHAR2,
+    i_schema_name  IN VARCHAR2 DEFAULT USER
+  ) RETURN CLOB IS
     v_package_name VARCHAR2(128) := UPPER(i_package_name);
+    v_schema_name  VARCHAR2(128) := UPPER(i_schema_name);
     v_json         CLOB;
     v_html         CLOB;
     v_comps        t_component_tab;
@@ -415,7 +438,7 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
         ORDER BY jt.seq
       ) LOOP
         add('<tr><td><code>' || apex_escape.html(r_row.name) || '</code></td><td>'
-          || text_html(r_row.descr, v_package_name) || '</td></tr>');
+          || text_html(r_row.descr, v_package_name, v_schema_name) || '</td></tr>');
       END LOOP;
       add('</table>');
     END name_desc_table;
@@ -425,13 +448,14 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
       SELECT pkg_data
       INTO v_json
       FROM ocd_apex_package_docs
-      WHERE object_name = v_package_name;
+      WHERE schema_name = v_schema_name
+        AND object_name = v_package_name;
     EXCEPTION WHEN NO_DATA_FOUND THEN
       RETURN NULL;
     END;
 
     IF json_value(v_json, '$.status') = 'NO_DATA_FOUND' THEN
-      RETURN '<p>The package ' || apex_escape.html(v_package_name)
+      RETURN '<p>The package ' || apex_escape.html(v_schema_name || '.' || v_package_name)
         || ' has not been inspected by ora* CODEDOC yet.</p>';
     END IF;
 
@@ -457,7 +481,7 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
     ORDER BY jt.comp_seq;
 
     add('<div class="ocd-doc">');
-    add(text_html(json_value(v_json, '$.desc' RETURNING CLOB), v_package_name));
+    add(text_html(json_value(v_json, '$.desc' RETURNING CLOB), v_package_name, v_schema_name));
 
     -- Constants
     v_started := FALSE;
@@ -468,7 +492,7 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
           || '<td><code>' || apex_escape.html(v_comps(i).comp_name) || '</code></td>'
           || '<td><code>' || apex_escape.html(v_comps(i).datatype) || '</code></td>'
           || '<td><code>' || apex_escape.html(v_comps(i).const_value) || '</code></td>'
-          || '<td>' || text_html(v_comps(i).comp_desc, v_package_name) || '</td></tr>');
+          || '<td>' || text_html(v_comps(i).comp_desc, v_package_name, v_schema_name) || '</td></tr>');
       END IF;
     END LOOP;
     end_table;
@@ -480,7 +504,7 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
         start_table('Subtypes', '<th>Name</th><th>Description</th>');
         add('<tr id="' || anchor_id(v_comps(i).comp_name) || '">'
           || '<td><code>' || apex_escape.html(v_comps(i).comp_name) || '</code></td>'
-          || '<td>' || text_html(v_comps(i).comp_desc, v_package_name) || '</td></tr>');
+          || '<td>' || text_html(v_comps(i).comp_desc, v_package_name, v_schema_name) || '</td></tr>');
       END IF;
     END LOOP;
     end_table;
@@ -495,7 +519,7 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
         END IF;
         add('<h3 id="' || anchor_id(v_comps(i).comp_name) || '">'
           || apex_escape.html(v_comps(i).comp_name) || '</h3>');
-        add(text_html(v_comps(i).comp_desc, v_package_name));
+        add(text_html(v_comps(i).comp_desc, v_package_name, v_schema_name));
         name_desc_table(v_comps(i).fields, 'Field');
       END IF;
     END LOOP;
@@ -507,7 +531,7 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
         start_table('Exceptions', '<th>Name</th><th>Description</th>');
         add('<tr id="' || anchor_id(v_comps(i).comp_name) || '">'
           || '<td><code>' || apex_escape.html(v_comps(i).comp_name) || '</code></td>'
-          || '<td>' || text_html(v_comps(i).comp_desc, v_package_name) || '</td></tr>');
+          || '<td>' || text_html(v_comps(i).comp_desc, v_package_name, v_schema_name) || '</td></tr>');
       END IF;
     END LOOP;
     end_table;
@@ -520,7 +544,7 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
         add('<tr><td><a href="#' || anchor_id(v_comps(i).comp_name, v_comps(i).overload) || '">'
           || apex_escape.html(v_comps(i).comp_name) || ' ' || INITCAP(v_comps(i).comp_type)
           || CASE WHEN v_comps(i).name_count > 1 THEN ' (' || v_comps(i).overload || ')' END
-          || '</a></td><td>' || text_html(v_comps(i).comp_desc, v_package_name) || '</td></tr>');
+          || '</a></td><td>' || text_html(v_comps(i).comp_desc, v_package_name, v_schema_name) || '</td></tr>');
       END IF;
     END LOOP;
     end_table;
@@ -532,7 +556,7 @@ CREATE OR REPLACE PACKAGE BODY ocd_apex_util AS
           || apex_escape.html(v_comps(i).comp_name) || ' ' || INITCAP(v_comps(i).comp_type)
           || CASE WHEN v_comps(i).name_count > 1 THEN ' (' || v_comps(i).overload || ')' END
           || '</h2>');
-        add(text_html(v_comps(i).comp_desc, v_package_name));
+        add(text_html(v_comps(i).comp_desc, v_package_name, v_schema_name));
 
         IF v_comps(i).syntax IS NOT NULL THEN
           add(code_html(v_comps(i).syntax, 'Syntax'));

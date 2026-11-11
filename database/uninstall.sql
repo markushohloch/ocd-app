@@ -36,6 +36,9 @@ BEGIN
   drop_object('DROP VIEW ocd_apex_component_params');
   drop_object('DROP VIEW ocd_apex_components');
   drop_object('DROP VIEW ocd_apex_package_docs');
+
+  -- Tabelle
+  drop_object('DROP TABLE ocd_apex_schema PURGE');
 END;
 /
 

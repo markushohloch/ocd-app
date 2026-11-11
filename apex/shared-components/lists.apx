@@ -85,5 +85,26 @@ list navigation-menu (
         }
     )
 
+    entry schemas (
+        label: Schemas
+        icon {
+            imageIconCssClasses: fa-database
+        }
+        layout {
+            sequence: 20
+        }
+        isCurrent {
+            type: pages
+            pages: [
+                4
+            ]
+        }
+        link {
+            target: {
+                page: 4
+            }
+        }
+    )
+
 )
 

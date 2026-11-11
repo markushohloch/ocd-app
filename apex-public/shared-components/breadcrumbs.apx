@@ -40,5 +40,17 @@ breadcrumb breadcrumb (
         }
     )
 
-)
+    entry schemas (
+        name: Schemas
+        pageNumber: 4
+        execution {
+            sequence: 10
+        }
+        link {
+            target: {
+                page: 4
+            }
+        }
+    )
 
+)

@@ -43,7 +43,7 @@ page 3 (
         source {
             htmlCode:
                 ```html
-                <p>Package "<strong>&P3_PACKAGE_NAME.</strong>" not found or not documented.</p>
+                <p>Package "<strong>&P3_SCHEMA_NAME..&P3_PACKAGE_NAME.</strong>" not found or not documented.</p>
                         
                 ```
         }
@@ -64,6 +64,14 @@ page 3 (
         type: hidden
         layout {
             sequence: 10
+            slot: body
+        }
+    )
+
+    pageItem P3_SCHEMA_NAME (
+        type: hidden
+        layout {
+            sequence: 5
             slot: body
         }
     )

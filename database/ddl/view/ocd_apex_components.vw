@@ -4,6 +4,7 @@
 
 CREATE OR REPLACE VIEW ocd_apex_components AS
 SELECT
+  p.schema_name,
   p.object_name,
   jt.comp_seq,
   jt.comp_name,

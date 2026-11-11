@@ -160,14 +160,17 @@ page 2 (
 
     region documentation (
         name: DOCUMENTATION
-        title: &P2_PACKAGE_NAME.
+        title: &P2_SCHEMA_NAME..&P2_PACKAGE_NAME.
         type: dynamicContent
         source {
             plsqlFunctionBody:
                 ```plsql
-                return ocd.ocd_apex_util.package_html(:P2_PACKAGE_NAME);
+                return ocd.ocd_apex_util.package_html(:P2_PACKAGE_NAME, :P2_SCHEMA_NAME);
                 ```
-            pageItemsToSubmit: P2_PACKAGE_NAME
+            pageItemsToSubmit: [
+                P2_SCHEMA_NAME
+                P2_PACKAGE_NAME
+            ]
         }
         layout {
             sequence: 20
@@ -195,12 +198,16 @@ page 2 (
                         || '</pre>'
                     into v_content
                     from ocd.ocd_apex_package_docs
-                    where object_name = :P2_PACKAGE_NAME;
+                    where schema_name = :P2_SCHEMA_NAME
+                    and object_name = :P2_PACKAGE_NAME;
 
                     return v_content;
                 end;
                 ```
-            pageItemsToSubmit: P2_PACKAGE_NAME
+            pageItemsToSubmit: [
+                P2_SCHEMA_NAME
+                P2_PACKAGE_NAME
+            ]
         }
         layout {
             sequence: 50
@@ -221,6 +228,14 @@ page 2 (
         type: hidden
         layout {
             sequence: 10
+            slot: body
+        }
+    )
+
+    pageItem P2_SCHEMA_NAME (
+        type: hidden
+        layout {
+            sequence: 5
             slot: body
         }
     )
@@ -279,19 +294,13 @@ page 2 (
         source {
             plsqlCode:
                 ```plsql
-                DECLARE
-                    l_cnt PLS_INTEGER;
                 BEGIN
-                    SELECT COUNT(*) INTO l_cnt
-                    FROM ocd_apex_package_docs
-                    WHERE object_name = :P2_PACKAGE_NAME;
-
-                    IF l_cnt = 0 THEN
+                    IF NOT ocd_apex_util.is_package(:P2_PACKAGE_NAME, :P2_SCHEMA_NAME) THEN
                         apex_util.redirect_url(
                             apex_page.get_url(
                                 p_page   => 3,
-                                p_items  => 'P3_PACKAGE_NAME',
-                                p_values => :P2_PACKAGE_NAME));
+                                p_items  => 'P3_SCHEMA_NAME,P3_PACKAGE_NAME',
+                                p_values => :P2_SCHEMA_NAME || ',' || :P2_PACKAGE_NAME));
                     END IF;
                 END;
                 ```

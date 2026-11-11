@@ -1,0 +1,163 @@
+page 4 (
+    name: Schemas
+    alias: SCHEMAS
+    title: Schemas
+    appearance {
+        pageTemplate: @/standard
+        templateOptions: #DEFAULT#
+    }
+    navigation {
+        cursorFocus: doNotFocusCursor
+        warnOnUnsavedChanges: false
+    }
+    security {
+        authorizationScheme: mustNotBePublicUser
+        pageAccessProtection: argumentsMustHaveChecksum
+        formAutoComplete: false
+    }
+
+    region breadcrumb (
+        name: Breadcrumb
+        type: breadcrumb
+        source {
+            breadcrumb: @breadcrumb
+        }
+        layout {
+            sequence: 10
+            slot: breadcrumbBar
+        }
+        appearance {
+            template: @/title-bar
+            templateOptions: [
+                #DEFAULT#
+                t-BreadcrumbRegion--useBreadcrumbTitle
+            ]
+        }
+        componentAppearance {
+            breadcrumbTemplate: @/breadcrumb
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    region schemas (
+        name: Scanned Schemas
+        type: staticContent
+        source {
+            htmlCode:
+                ```html
+                <p>The Package Browser lists the packages of the selected schemas. <strong>Inspect all packages</strong> documents all of them with ora* CODEDOC.</p>
+                ```
+        }
+        layout {
+            sequence: 20
+            slot: body
+        }
+        appearance {
+            template: @/standard
+            templateOptions: [
+                #DEFAULT#
+                t-Region--scrollBody
+            ]
+        }
+    )
+
+    pageItem P4_SCHEMAS (
+        type: shuttle
+        label {
+            label: Schemas
+            alignment: left
+        }
+        settings {
+            showControls: all
+        }
+        lov {
+            type: sqlQuery
+            sqlQuery:
+                ```sql
+                select username as d,
+                       username as r
+                  from all_users
+                 where oracle_maintained = 'N'
+                 order by username
+                ```
+        }
+        layout {
+            sequence: 10
+            region: @schemas
+            slot: regionBody
+        }
+        appearance {
+            template: @/required-above
+            templateOptions: #DEFAULT#
+            height: 10
+        }
+        validation {
+            valueRequired: true
+        }
+        source {
+            type: sqlQueryMultipleValues
+            sqlQuery:
+                ```sql
+                select schema_name
+                  from ocd_apex_schema
+                ```
+        }
+        help {
+            helpText: Move the schemas whose packages should be shown and inspected to the right side.
+        }
+    )
+
+    button save (
+        buttonName: SAVE
+        label: Save
+        layout {
+            sequence: 10
+            region: @schemas
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text
+            hot: true
+            templateOptions: #DEFAULT#
+        }
+        behavior {
+            warnOnUnsavedChanges: doNotCheck
+        }
+    )
+
+    process save-schemas (
+        name: Save Schemas
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                delete from ocd_apex_schema
+                 where schema_name not in (
+                         select column_value
+                           from apex_string.split(:P4_SCHEMAS, ':'));
+
+                -- Only existing schemas that are not maintained by Oracle
+                insert into ocd_apex_schema (schema_name)
+                select username
+                  from all_users
+                 where oracle_maintained = 'N'
+                   and username in (
+                         select column_value
+                           from apex_string.split(:P4_SCHEMAS, ':'))
+                   and username not in (
+                         select schema_name
+                           from ocd_apex_schema);
+                ```
+        }
+        execution {
+            sequence: 10
+        }
+        successMessage {
+            successMessage: Schemas saved
+        }
+        serverSideCondition {
+            whenButtonPressed: @save
+        }
+    )
+
+)

@@ -6,8 +6,9 @@
 Oracle Cloud Database
 └── OCD Schema
     ├── ocd.api.* (ora* CODEDOC Framework)
+    ├── Tabelle ocd_apex_schema        (Schemas, deren Packages die App zeigt)
     ├── Views
-    │   ├── ocd_apex_package_docs      (je Package das JSON aus ocd.api.information)
+    │   ├── ocd_apex_package_docs      (je Package der Schemas das JSON aus ocd.api.information)
     │   ├── ocd_apex_components        ($.components[*] als Zeilen)
     │   └── ocd_apex_component_params  ($.components[*].parameters[*] als Zeilen)
     ├── Package ocd_apex_util          (Inspect-Helfer, HTML-Rendering der Doku)
@@ -15,7 +16,9 @@ Oracle Cloud Database
 ```
 
 **Prinzip**: Alles im OCD Schema, keine Synonyme, direkte Zugriffe.
-Die App zeigt nur Packages des OCD Schemas (`user_objects`).
+Die App zeigt die Packages der Schemas aus `ocd_apex_schema`. Package-Liste und
+Quelltext fremder Schemas liest `ocd.worker` (`schema_packages`, `object_code`)
+mit seiner Rolle `SELECT_CATALOG_ROLE`; die App selbst braucht keine Dictionary-Rechte.
 
 Läuft die APEX-App mit einem anderen Parsing Schema, braucht dieses:
 
@@ -54,6 +57,12 @@ grant execute on ocd_apex_util to <APEX_SCHEMA>;
 - Filter bei jeder Eingabe (Dynamic Action auf `keyup`)
 - Suche in Paketnamen und Beschreibungen
 
+**US-5: Schemas auswählen** ✅
+- Seite „Schemas“ (P4) für angemeldete User, Shuttle mit allen Schemas aus `all_users` ohne `oracle_maintained`
+- Auswahl gilt global (Tabelle `ocd_apex_schema`), Vorbild ist die Seite „Schema Check“ von occ-apex
+- „Inspect all packages“ dokumentiert alle Packages der ausgewählten Schemas
+- Package-Liste, Detailseite und Links `[[SCHEMA.PACKAGE]]` berücksichtigen das Schema
+
 **US-4: Fehlerbehandlung** ✅
 - Paket nicht gefunden → Error-Seite (P3)
 - Manipulierte URL-Parameter → von APEX abgewiesen (Page Access Protection mit Checksumme)
@@ -65,12 +74,14 @@ grant execute on ocd_apex_util to <APEX_SCHEMA>;
 | P1 | Package Browser | Interactive Report | Alle Pakete, Suchfeld, Link zu P2 |
 | P2 | Package Details | Dynamic Content | Doku aus `ocd_apex_util.package_html`, JSON-Quelle zum Aufklappen |
 | P3 | Error | Static Content | „Package not found or not documented“ |
+| P4 | Schemas | Shuttle | Auswahl der Schemas, nur für angemeldete User |
 
 ### SQL-Queries
 
 **Paketliste (P1):**
 ```sql
-select object_name,
+select schema_name,
+       object_name,
        json_value(pkg_data, '$.name') as name,
        json_value(pkg_data, '$.desc') as description
   from ocd_apex_package_docs;
@@ -78,14 +89,15 @@ select object_name,
 
 **Package-Details (P2):**
 ```sql
-select ocd_apex_util.package_html(:P2_PACKAGE_NAME) from dual;
+select ocd_apex_util.package_html(:P2_PACKAGE_NAME, :P2_SCHEMA_NAME) from dual;
 ```
 
 **Komponenten eines Packages:**
 ```sql
 select comp_name, comp_type, comp_desc, syntax
   from ocd_apex_components
- where object_name = :P2_PACKAGE_NAME
+ where schema_name = :P2_SCHEMA_NAME
+   and object_name = :P2_PACKAGE_NAME
  order by comp_seq;
 ```
 
@@ -95,11 +107,11 @@ select comp_name, comp_type, comp_desc, syntax
 - [ ] Syntax-Highlighting für Syntax und Examples
 - [ ] Hierarchie-View (Baum-Struktur für Komponenten)
 - [ ] Deprecation-Hinweise anzeigen (`pragma deprecate`); setzt voraus, dass `ocd.api.information` sie im JSON liefert
-- [ ] Packages anderer Schemas anzeigen (bisher nur `user_objects` des OCD Schemas)
+- [x] Packages anderer Schemas anzeigen (Seite „Schemas“)
 
 **Performance**
 
-Jede Abfrage auf `ocd_apex_package_docs` ruft `ocd.api.information` einmal je Package auf, P1 also für alle Packages des Schemas. Für kleine bis mittlere Schemas reicht das.
+Jede Abfrage auf `ocd_apex_package_docs` ruft `ocd.api.information` einmal je Package auf, P1 also für alle Packages der ausgewählten Schemas. Für kleine bis mittlere Schemas reicht das.
 - [ ] JSON in einer Tabelle cachen, aktualisiert nach `inspect`
 - [ ] alternativ Materialized View mit regelmäßigem Refresh
 - [ ] HTTP-Caching, falls eine REST-API dazukommt
